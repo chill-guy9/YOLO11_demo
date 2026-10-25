@@ -1,0 +1,8 @@
+# 由 src/split_dataset.py 自动生成，请勿手改（改了也会被重新覆盖）
+path: D:/桌面/YOLO训练识别/data/dataset
+train: images/train
+val: images/val
+test: images/test
+
+nc: 5
+names: ['eiffel_tower', 'sydney_opera', 'oriental_pearl', 'statue_of_liberty', 'great_wall']

@@ -1,0 +1,31 @@
+# ===== 数据与训练产物（体积大、可重新生成）=====
+/data/
+/models/
+/runs/
+
+# ===== 预训练 / 训练权重 =====
+*.pt
+*.pth
+*.onnx
+*.engine
+*.openvino*
+
+# ===== IDE / 编辑器 =====
+/.idea/
+/.vscode/
+*.swp
+*~
+
+# ===== 本地工具缓存 =====
+/.workbuddy/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db

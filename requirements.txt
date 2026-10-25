@@ -1,0 +1,20 @@
+# ============================================================
+# YOLO11 建筑识别 · CPU 环境依赖
+# 安装顺序很重要：先装 CPU 版 torch，再装 ultralytics，
+# 否则 ultralytics 会把 CUDA 版 torch（约 3GB）一起拉下来。
+# ============================================================
+# 第 1 步（单独执行，不要走 pip install -r）：
+#   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# 第 2 步：
+#   python -m pip install -r requirements.txt
+# ------------------------------------------------------------
+
+ultralytics>=8.3.0        # YOLO11 训练 / 推理 / 导出
+opencv-python>=4.10       # 视频推理与可视化
+pillow>=10.0              # 图片读写
+imagehash>=4.3            # 数据集去重（pHash 感知哈希）
+icrawler>=0.6.6           # 图片采集（备选数据源，Bing 图片爬虫）
+
+# ---- 可选：CPU 推理加速（按需二选一或都装）----
+# onnxruntime>=1.20       # ONNX 加速，跨平台通用
+# openvino>=2024.5        # Intel/AMD CPU 上加速效果最好（比 PyTorch 快 2~3 倍）
