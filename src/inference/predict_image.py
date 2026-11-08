@@ -2,10 +2,12 @@
 图像推理脚本（演示"能够识别图像"）
 =================================
 用法：
-  python src/predict_image.py --source data/demo.jpg
-  python src/predict_image.py --source data/test_imgs/            # 整个文件夹
-  python src/predict_image.py --source data/demo.jpg --save       # 保存画框结果图
-  python src/predict_image.py --source data/demo.jpg --openvino   # 用 OpenVINO 加速模型
+  python src/inference/predict_image.py --source data/demo.jpg
+  python src/inference/predict_image.py --source data/test_imgs/            # 整个文件夹
+  python src/inference/predict_image.py --source data/demo.jpg --save       # 保存画框结果图
+  python src/inference/predict_image.py --source data/demo.jpg --onnx       # 用导出的 ONNX 模型推理
+  python src/inference/predict_image.py --source data/demo.jpg --openvino   # 用 OpenVINO 加速模型
+加 --onnx 时会自动把 .pt 权重路径换成同目录的 .onnx（需先运行 export_onnx.py）。
 权重查找顺序：models/best.pt -> runs/detect/*/weights/best.pt（按时间取最新）
 """
 import argparse
@@ -33,18 +35,26 @@ def find_weights(use_openvino: bool) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", required=True, help="图片路径或文件夹")
-    ap.add_argument("--weights", default=None)
+    ap.add_argument("--source", default=r"D:\YOLO训练识别\eiffel-tower-test.jpg",
+                    help="待检测的图片/文件夹路径")
+    ap.add_argument("--weights", default=r"D:\YOLO训练识别\runs\detect\landmark_v5_1025\weights\best.onnx",
+                    help="权重路径；留空则自动查找最近一次训练的 best.pt")
     ap.add_argument("--imgsz", type=int, default=320)
     ap.add_argument("--conf", type=float, default=0.25)
     ap.add_argument("--iou", type=float, default=0.4, help="NMS IoU 阈值，越小抑制越强")
     ap.add_argument("--max-det", type=int, default=0, help="每图最多保留几个目标；0=不限，演示可用 1")
     ap.add_argument("--save", action="store_true", help="保存画框结果图到 runs/detect/predict/")
+    ap.add_argument("--onnx", action="store_true", help="用 ONNX Runtime 推理（自动换用同目录 best.onnx）")
     ap.add_argument("--openvino", action="store_true")
     args = ap.parse_args()
 
     weights = args.weights or find_weights(args.openvino)
-    print(f"加载模型: {weights}")
+    if args.onnx and Path(weights).suffix.lower() == ".pt":
+        cand = Path(weights).with_suffix(".onnx")
+        if not cand.exists():
+            raise SystemExit(f"找不到 {cand}，请先运行 src/inference/export_onnx.py")
+        weights = str(cand)
+    print(f"加载模型: {weights} [{'ONNX Runtime' if args.onnx or Path(weights).suffix == '.onnx' else 'PyTorch'}]")
     model = YOLO(weights)
 
     results = model.predict(
@@ -57,7 +67,7 @@ def main() -> None:
         save=args.save,
         project=str(Path("runs/detect").resolve()),
         name="predict",
-        exist_ok=True,
+        exist_ok=False,
         verbose=False,
     )
     for r in results:

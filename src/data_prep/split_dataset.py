@@ -7,8 +7,9 @@
 类别定义在 data/classes.txt：每行一个类别名，行号（从 0 开始）即类别 id。
 
 用法：
-  python src/split_dataset.py                     # 默认 8:1:1，seed=42
-  python src/split_dataset.py --ratio 0.8 0.1 0.1 # 显式指定比例
+  python src/data_prep/split_dataset.py                     # 默认 8:1:1，seed=42
+  python src/data_prep/split_dataset.py --ratio 0.8 0.1 0.1 # 显式指定比例
+  python src/data_prep/split_dataset.py --yaml-only         # 项目迁移目录后只修 data.yaml 的 path
 """
 import argparse
 import random
@@ -25,9 +26,21 @@ def main() -> None:
     ap.add_argument("--classes", default="data/classes.txt")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--ratio", nargs=3, type=float, default=[0.8, 0.1, 0.1])
+    ap.add_argument("--yaml-only", action="store_true",
+                    help="只把 data.yaml 的 path 修正为当前 dst 的绝对路径，不重新划分/复制图片")
     args = ap.parse_args()
 
     src, dst = Path(args.src), Path(args.dst)
+    if args.yaml_only:
+        cfg = Path("data.yaml")
+        if not cfg.exists():
+            raise SystemExit("data.yaml 不存在，无法仅修正路径")
+        new_path = dst.resolve().as_posix()
+        lines = [f"path: {new_path}" if line.startswith("path:") else line
+                 for line in cfg.read_text(encoding="utf-8").splitlines()]
+        cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"已修正 data.yaml 的 path -> {new_path}（类别定义与数据集划分保持不变）")
+        return
     names = []
     for line in Path(args.classes).read_text(encoding="utf-8").splitlines():
         name = line.split("#", 1)[0].strip()  # 支持行内中文注释

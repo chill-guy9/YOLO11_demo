@@ -1,5 +1,5 @@
 # 由 src/split_dataset.py 自动生成，请勿手改（改了也会被重新覆盖）
-path: D:/桌面/YOLO训练识别/data/dataset
+path: D:/YOLO训练识别/data/dataset
 train: images/train
 val: images/val
 test: images/test

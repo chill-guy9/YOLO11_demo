@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YOLO11 .pt 与 ONNX 对比实测汇报</title>
+<style>
+:root{
+  --bg:#f5f7fa; --card:#ffffff; --ink:#1b2028; --muted:#5f6a78; --line:#e2e7ee;
+  --blue:#2563eb; --blue-soft:#e8f0fe; --green:#0f8f6c; --green-soft:#e3f5ef;
+  --amber:#c07a10; --amber-soft:#fdf2df; --red:#c23b3b; --red-soft:#fdeaea;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.page{max-width:1080px;margin:0 auto;padding:36px 28px 60px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+  border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:28px;flex-wrap:wrap}
+h1{font-size:25px;font-weight:600;margin:0 0 6px;letter-spacing:-.3px}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.meta{font-size:12px;color:var(--muted);text-align:right;line-height:1.8}
+h2{font-size:17px;font-weight:600;margin:34px 0 12px;padding-left:10px;border-left:3px solid var(--blue)}
+h3{font-size:14px;font-weight:600;margin:18px 0 8px}
+p{margin:8px 0}
+.hero{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:26px 28px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.hero-main{font-size:19px;font-weight:600;margin:0 0 6px}
+.hero-sub{color:var(--muted);font-size:13px;margin:0}
+.big{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.2;white-space:nowrap}
+.big span{color:var(--muted);font-size:20px;font-weight:400;margin:0 8px}
+.tag{display:inline-block;background:var(--green-soft);color:var(--green);
+  border-radius:6px;padding:2px 9px;font-size:12px;font-weight:600;margin-left:8px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.kpi .label{color:var(--muted);font-size:12px;margin-bottom:6px}
+.kpi .value{font-size:23px;font-weight:650;letter-spacing:-.4px}
+.kpi .foot{color:var(--muted);font-size:11.5px;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{background:#f8fafc;font-weight:600;color:var(--muted);font-size:12.5px}
+tbody tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.emph td{background:var(--blue-soft);font-weight:600}
+.same{color:var(--green);font-weight:600}
+.warn{background:var(--amber-soft);border:1px solid #f0dcb4;border-left:4px solid var(--amber);
+  border-radius:10px;padding:16px 20px;margin-top:14px}
+.warn strong{color:var(--amber)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.col{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.col h3{margin-top:0}
+.col ul{margin:8px 0 0;padding-left:20px}
+.col li{margin:5px 0}
+.pro li::marker{color:var(--green)}
+.con li::marker{color:var(--red)}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:5px;padding:1px 7px;margin-left:6px}
+.badge.g{background:var(--green-soft);color:var(--green)}
+.badge.a{background:var(--amber-soft);color:var(--amber)}
+.bars{margin-top:6px}
+.barrow{display:grid;grid-template-columns:120px 1fr 1fr;gap:14px;align-items:center;margin-bottom:11px}
+.barlabel{font-size:13px}
+.barcell{display:flex;align-items:center;gap:8px}
+.track{flex:1;height:13px;background:#eef1f5;border-radius:4px;overflow:hidden}
+.fill{height:100%;border-radius:4px}
+.barval{width:52px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+.barhead{font-size:12px;color:var(--muted);margin-bottom:8px}
+.note{color:var(--muted);font-size:12.5px;margin-top:10px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+  background:#f1f4f8;border-radius:4px;padding:1px 5px;font-size:12.5px}
+pre{background:#1e2530;color:#e8edf4;border-radius:10px;padding:16px 18px;overflow-x:auto;
+  font-size:12.5px;line-height:1.75;margin:10px 0}
+pre code{background:none;color:inherit;padding:0}
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.flow .card{border-top:3px solid var(--blue)}
+.flow .card.second{border-top-color:var(--green)}
+footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:12px}
+@media(max-width:760px){
+  .kpis{grid-template-columns:repeat(2,1fr)}.cols,.flow{grid-template-columns:1fr}
+  .barrow{grid-template-columns:96px 1fr 1fr;gap:8px}.meta{text-align:left}
+}
+@media print{
+  body{background:#fff}.page{max-width:none;padding:0}
+  .card,.kpi,.col,.hero{box-shadow:none;break-inside:avoid}
+  pre{background:#f4f6f9;color:#1b2028;border:1px solid var(--line)}
+  h2{break-after:avoid}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <div>
+    <h1>YOLO11 训练权重导出 ONNX：准确度与工程取舍实测</h1>
+    <p class="sub">5 类标志性建筑识别 · yolo11n @320 · 纯 CPU 环境全链路验证</p>
+  </div>
+  <div class="meta">
+    实测日期：2026-11-07 ~ 11-08<br>
+    torch 2.8.0+cpu / ultralytics 8.4.21<br>
+    onnx 1.17.0 / onnxruntime 1.19.2<br>
+    AMD Ryzen 7 7840H（8 线程，无 GPU）
+  </div>
+</header>
+
+<div class="hero">
+  <div>
+    <p class="hero-main">结论：导出 ONNX 没有任何精度损失<span class="tag">零掉点</span></p>
+    <p class="hero-sub">同一套 34 张 test、同一输入管线（rect=False）下，P / R / mAP / 逐类 AP / 检测框全部逐位相同。<br>
+      真正的差别在部署形态：换 ONNX 得到更轻的依赖与更快 CPU 推理，代价是体积翻倍、尺寸写死、不能训练。</p>
+  </div>
+  <div class="big">0.8684<span>=</span>0.8684</div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="label">mAP@0.50（PT / ONNX）</div><div class="value">0.8684</div><div class="foot">差值 0.0000，逐类 AP 亦相同</div></div>
+  <div class="kpi"><div class="label">CPU 端到端延迟</div><div class="value">41.7 → 31.4 ms</div><div class="foot">1.33× 提速，24.0 → 31.9 FPS</div></div>
+  <div class="kpi"><div class="label">检测框一致性</div><div class="value">38 / 38</div><div class="foot">100% 匹配，置信度差 0</div></div>
+  <div class="kpi"><div class="label">文件体积</div><div class="value">5.21 → 10.00 MB</div><div class="foot">FP16 序列化 vs FP32 落盘</div></div>
+</div>
+
+<h2>一、准确度对比（test 集 34 张 / imgsz 320 / rect=False）</h2>
+<div class="card">
+<table>
+  <thead><tr><th>指标</th><th class="num">原 best.pt</th><th class="num">FP32 重存 .pt</th><th class="num">ONNX Runtime</th><th class="num">ONNX − 原 pt</th></tr></thead>
+  <tbody>
+    <tr class="emph"><td>mAP@0.50</td><td class="num">0.8684</td><td class="num">0.8684</td><td class="num">0.8684</td><td class="num same">+0.0000</td></tr>
+    <tr><td>mAP@0.50:0.95</td><td class="num">0.5388</td><td class="num">0.5388</td><td class="num">0.5388</td><td class="num">+0.0000</td></tr>
+    <tr><td>Precision</td><td class="num">0.7607</td><td class="num">0.7607</td><td class="num">0.7607</td><td class="num">+0.0000</td></tr>
+    <tr><td>Recall</td><td class="num">0.9087</td><td class="num">0.9087</td><td class="num">0.9087</td><td class="num">+0.0000</td></tr>
+  </tbody>
+</table>
+<p class="note">五个类别 AP@50 全部相同：0.9950 / 0.7816 / 0.9950 / 0.8283 / 0.7423。
+网络原始输出 <code>(1,9,2100)</code> 最大绝对误差 <code>9.46e-4</code>、平均 <code>1.55e-5</code>（算子融合与浮点累加顺序造成的舍入级差异）。</p>
+</div>
+
+<div class="warn">
+  <strong>避坑：不对齐预处理会测出假精度差。</strong> 静态 ONNX 被强制正方形 letterbox
+  <code>(1,3,320,320)</code> / 2100 anchors，而 .pt 默认 <code>rect=True</code> 走矩形
+  <code>(1,3,320,256)</code> / 1680 anchors。直接对比会得到 <strong>0.8221 vs 0.8684</strong>；
+  给 .pt 显式 <code>rect=False</code> 后 P / R / mAP 与 ONNX 逐位相同。小测试集上这种输入差异会被放大成 0.046 的"精度差"。
+</div>
+
+<h2>二、优缺点对照</h2>
+<div class="cols">
+  <div class="col">
+    <h3>PyTorch .pt</h3>
+    <ul class="pro">
+      <li>可继续训练 / 微调，是再导出其它格式的唯一源头</li>
+      <li>体积小（5.21 MB，FP16 序列化，加载时自动转 FP32）</li>
+      <li>支持动态尺寸、矩形 letterbox 推理</li>
+      <li>Ultralytics 官方 train / val / plots / benchmark 工具链齐全</li>
+    </ul>
+    <h3>短板</h3>
+    <ul class="con">
+      <li>部署必须带 PyTorch，环境重、跨语言几乎不可行</li>
+      <li>CPU 端到端比 ONNX 慢约 33%</li>
+      <li>pickle 反序列化安全、torch 版本兼容风险</li>
+    </ul>
+  </div>
+  <div class="col">
+    <h3>ONNX Runtime .onnx</h3>
+    <ul class="pro">
+      <li>精度零损失，检测框与置信度完全一致</li>
+      <li>CPU 提速 1.33×，运行时只需 onnxruntime（几十 MB）</li>
+      <li>框架中立：C++ / Java / JS / 移动端 / Web，可再转 TensorRT、OpenVINO、INT8</li>
+      <li>类别名、stride、imgsz 等元数据已写进图，便于独立交付</li>
+    </ul>
+    <h3>短板</h3>
+    <ul class="con">
+      <li>不能训练；文件约 2 倍大（FP32 落盘）</li>
+      <li>静态 <code>[1,3,320,320]</code>，换分辨率需重导或 <code>--dynamic</code></li>
+      <li>脱离 Ultralytics 需自写预处理 + 解码 + NMS（本项目已提供两套脚本）</li>
+      <li>opset / 算子兼容需在目标设备复验</li>
+    </ul>
+  </div>
+</div>
+
+<h2>三、四种导出变体实测（同批次 CPU）</h2>
+<div class="card">
+  <div class="bars">
+    <div class="barrow barhead"><span>变体</span><span>文件体积（MB，刻度 10.34）</span><span>CPU 延迟（ms，刻度 50.45）</span></div>
+    <div class="barrow"><span class="barlabel">FP32 静态（主产物）</span>
+      <div class="barcell"><div class="track"><div class="fill" style="width:96.7%;background:#2563eb"></div></div><span class="barval">10.00</span></div>
+      <div class="barcell"><div class="track"><div class="fill" style="width:55.4%;background:#2563eb"></div></div><span class="barval">27.97</span></div></div>
+    <div class="barrow"><span class="barlabel">--nms <span class="badge g">最快</span></span>
+      <div class="barcell"><div class="track"><div class="fill" style="width:97.0%;background:#0f8f6c"></div></div><span class="barval">10.03</span></div>
+      <div class="barcell"><div class="track"><div class="fill" style="width:46.9%;background:#0f8f6c"></div></div><span class="barval">23.65</span></div></div>
+    <div class="barrow"><span class="barlabel">--half <span class="badge a">最小</span></span>
+      <div class="barcell"><div class="track"><div class="fill" style="width:48.8%;background:#c07a10"></div></div><span class="barval">5.05</span></div>
+      <div class="barcell"><div class="track"><div class="fill" style="width:100%;background:#c07a10"></div></div><span class="barval">50.45</span></div></div>
+    <div class="barrow"><span class="barlabel">--dynamic</span>
+      <div class="barcell"><div class="track"><div class="fill" style="width:100%;background:#8a94a3"></div></div><span class="barval">10.34</span></div>
+      <div class="barcell"><div class="track"><div class="fill" style="width:93.7%;background:#8a94a3"></div></div><span class="barval">47.28</span></div></div>
+  </div>
+  <table style="margin-top:16px">
+    <thead><tr><th>变体</th><th>输出</th><th class="num">mAP@50</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr class="emph"><td>FP32 静态</td><td><code>[1,9,2100]</code></td><td class="num">0.8684</td><td>基准，全功能验证用</td></tr>
+      <tr><td>--nms</td><td><code>[1,300,6]</code> 已含框</td><td class="num">0.8793 *</td><td>最快，纯部署首选</td></tr>
+      <tr><td>--half</td><td><code>[1,9,2100]</code> FP16</td><td class="num">0.8682</td><td>体积减半、精度几乎无损，但 CPU 慢 1.8×</td></tr>
+      <tr><td>--dynamic</td><td>符号维度</td><td class="num">0.8684</td><td>精度不变，CPU 慢 1.69×</td></tr>
+    </tbody>
+  </table>
+  <p class="note">延迟为 20 张图 × 2 轮中位值，只在本批次内部横向比较。
+  * <code>0.8793</code> 是图内 NMS（conf=0.25）与 val 外置 NMS（conf=0.001）口径不同，<strong>不是精度提升</strong>。
+  FP16 在本机 onnxruntime 上能正常加载推理，只是 CPU 需做精度转换所以变慢；纯 CPU 生产别用 <code>--half</code> / <code>--dynamic</code>。</p>
+</div>
+
+<h2>四、两条纯部署链路（均不依赖 torch / ultralytics）</h2>
+<div class="flow">
+  <div class="card">
+    <h3>静态 FP32 版 · 自写 NMS</h3>
+    <p>只依赖 numpy + cv2 + onnxruntime；自己实现 letterbox（含 BGR→RGB）、xywh→xyxy 解码、按类别 NMS、坐标还原。</p>
+    <p>校验：34 张 test <strong>35/35 框匹配</strong>、conf 差 0、坐标差 0.54 px。</p>
+    <pre><code>python src/inference/predict_onnx_native.py --save
+python runs/detect/landmark_v5_1025/compare/verify_native_onnx.py</code></pre>
+  </div>
+  <div class="card second">
+    <h3>--nms 入图版 · 免写 NMS</h3>
+    <p>输出直接是 <code>(x1,y1,x2,y2,conf,cls)</code>，只需 conf 过滤 + 坐标还原；端到端 23.65 ms，四变体中最快。</p>
+    <p>校验：34 张 test <strong>38/38 框匹配</strong>、conf 差 0、坐标差 0.52 px。</p>
+    <pre><code>python src/inference/predict_onnx_nms_native.py --save
+python runs/detect/landmark_v5_1025/compare/variants/verify_nms_native.py</code></pre>
+  </div>
+</div>
+<p class="note">两个脚本输出格式不同，不能混用模型。写纯部署脚本最容易漏的是 <strong>BGR→RGB 翻转</strong>：漏掉会令置信度从 0.917 掉到 0.785、框明显内缩。</p>
+
+<h2>五、选型与产物</h2>
+<div class="card">
+<table>
+  <thead><tr><th>场景</th><th>建议</th></tr></thead>
+  <tbody>
+    <tr><td>继续训练 / 调参 / 换数据集</td><td>保留 <code>best.pt</code>，它是唯一可再训练的源头</td></tr>
+    <tr><td>纯 CPU 服务器批量推理</td><td>主产物 FP32 静态 ONNX（1.33×），或 <code>--nms</code> 版（更快）</td></tr>
+    <tr><td>交付给没有 PyTorch 的环境 / C++ / 移动端 / Web</td><td><code>--nms</code> 版 + 对应纯部署脚本</td></tr>
+    <tr><td>分发体积敏感、目标设备是 GPU / 移动端</td><td><code>--half</code>（5.05 MB）</td></tr>
+    <tr><td>输入分辨率经常变</td><td>.pt，或重新导出 <code>--dynamic</code></td></tr>
+  </tbody>
+</table>
+<p class="note" style="margin-top:14px">推荐两个都留：<code>best.pt</code> 作可再训练主权重，<code>best.onnx</code> 作部署产物；每次重训后重跑导出 + 对比脚本确认精度未回退。</p>
+<pre><code>python src/inference/export_onnx.py
+python src/train_eval/compare_pt_onnx.py
+python src/train_eval/benchmark_onnx_variants.py</code></pre>
+</div>
+
+<footer>
+  数据文件：<code>compare/results.json</code>、<code>compare/variants/results.json</code> ｜
+  完整报告：<code>docs/ONNX_vs_PyTorch_对比.md</code> ｜
+  主产物：<code>runs/detect/landmark_v5_1025/weights/best.onnx</code><br>
+  本页为自包含静态页面，可离线打开、投屏或直接打印为 PDF。所有数字均来自本机实测。
+</footer>
+
+</div>
+</body>
+</html>

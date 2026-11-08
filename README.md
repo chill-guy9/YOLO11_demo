@@ -31,11 +31,16 @@ YOLO11 建筑识别完整工程。任务要求：≥5 类标志性建筑、≥20
 │   ├── train_eval/              # ② 训练与评估
 │   │   ├── train.py             #   CPU 训练入口（yolo11n@320, 100 epochs ≈ 22 分钟）
 │   │   ├── eval_compare.py      #   多权重 × 多划分对比评估（输出 Markdown 表）
-│   │   └── benchmark.py         #   PyTorch vs OpenVINO 端到端/前向基准
+│   │   ├── benchmark.py         #   PyTorch vs OpenVINO 端到端/前向基准
+│   │   ├── compare_pt_onnx.py   #   PyTorch vs ONNX 准确度/一致性/速度三方对比
+│   │   └── benchmark_onnx_variants.py  # ONNX 四种导出变体实测（dynamic/nms/half）
 │   ├── inference/               # ③ 推理与演示
-│   │   ├── predict_image.py     #   图像推理
-│   │   ├── predict_video.py     #   视频/摄像头推理（可 --stride 跳帧）
+│   │   ├── predict_image.py     #   图像推理（可 --onnx / --openvino）
+│   │   ├── predict_video.py     #   视频/摄像头推理（可 --onnx / --stride）
+│   │   ├── predict_onnx_native.py  # 纯 onnxruntime 推理（无 torch/ultralytics）
+│   │   ├── predict_onnx_nms_native.py  # 纯 onnxruntime 推理（NMS 入图版）
 │   │   ├── make_demo_video.py   #   用图片合成带运镜的演示视频（无需联网）
+│   │   ├── export_onnx.py       #   导出 ONNX 模型
 │   │   └── export_openvino.py   #   导出 OpenVINO 模型
 │   └── tools/                   # ④ 工具
 │       └── recycle_tool.py      #   安全删除（走系统回收站，可恢复）
@@ -120,6 +125,39 @@ python src/inference/predict_video.py --source data/demo.mp4 --show --stride 2
 python src/inference/export_openvino.py
 python src/inference/predict_image.py --source data/demo.jpg --openvino
 ```
+
+### 5.1 导出 ONNX 与框架对比（2026-11-07 新增）
+
+```bash
+python src/inference/export_onnx.py        # -> runs/detect/landmark_v5_1025/weights/best.onnx
+python src/train_eval/compare_pt_onnx.py   # 三方对比，结果存 runs/detect/landmark_v5_1025/compare/results.json
+python src/inference/predict_image.py --onnx
+python src/inference/predict_video.py --source data/demo.mp4 --onnx
+python src/inference/predict_onnx_native.py --save   # 纯 onnxruntime，不依赖 torch/ultralytics
+python runs/detect/landmark_v5_1025/compare/verify_native_onnx.py  # 与官方管线逐框校验
+python src/train_eval/benchmark_onnx_variants.py    # 四种导出变体实测
+python src/inference/predict_onnx_nms_native.py --save  # 最优变体的纯部署脚本
+```
+
+实测（34 张 test，`imgsz=320`，CPU）：**mAP@50 两者均为 0.8684，零精度损失**；
+网络原始输出最大误差 `9.46e-4`，最终检测框 38/38 完全一致；
+端到端延迟 `41.7 ms → 31.4 ms`（**1.33×**）；体积 `5.21 MB → 10.00 MB`。
+纯 ONNX Runtime 实现与官方管线对比：**35/35 框匹配、置信度差 0、坐标差 0.54 px**（2026-11-08 复验）。
+
+四种导出变体（同批次 CPU 实测）：静态 FP32 `10.00 MB / 27.97 ms`；`--nms` `10.03 MB / 23.65 ms`（最快，
+输出已含框）；`--half` `5.05 MB / 50.45 ms`（体积减半但 CPU 慢 1.8×）；`--dynamic` `10.34 MB / 47.28 ms`。
+**纯 CPU 生产别用 `--half` / `--dynamic`；纯部署优先 `--nms`**。NMS 入图版已配好纯部署脚本
+`predict_onnx_nms_native.py`（不用自写 NMS），34 张 test 与官方管线 38/38 框匹配、conf 差 0。
+详见报告第八节。
+
+> ⚠️ 对比时务必 `rect=False` 对齐输入：静态 ONNX 只能吃 320×320 正方形，
+> 而 `.pt` 默认走矩形 letterbox（320×256），不对齐会 fake 出 `0.8221 vs 0.8684` 的假精度差。
+> 完整优缺点、选型建议与复现步骤见 **`docs/ONNX_vs_PyTorch_对比.md`**；
+> 一页式汇报页（自包含 HTML，可离线打开 / 投屏 / 打印）见 **`docs/onnx_comparison.html`**。
+
+> ✅ `data.yaml` 的 `path` 已从迁移前的桌面旧目录修正为 `D:/YOLO训练识别/data/dataset`
+> （`python src/data_prep/split_dataset.py --yaml-only`，只改路径不重新划分数据集），
+> 现在可以直接 `yolo val` / 重训练。
 
 ## 项目状态：已完成 ✅（2026-10-25）
 

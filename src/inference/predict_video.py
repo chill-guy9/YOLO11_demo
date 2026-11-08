@@ -32,12 +32,23 @@ def main() -> None:
     ap.add_argument("--max-det", type=int, default=1, help="每帧最多保留几个目标；演示默认 1 最干净")
     ap.add_argument("--stride", type=int, default=1, help="每几帧推理一次")
     ap.add_argument("--show", action="store_true", help="弹窗显示（默认只保存文件）")
+    ap.add_argument("--onnx", action="store_true", help="用导出的 ONNX 模型推理（默认 PyTorch）")
     ap.add_argument("--openvino", action="store_true")
     args = ap.parse_args()
 
     from ultralytics import YOLO
 
-    weights = args.weights or find_weights(args.openvino)
+    if args.onnx:
+        if args.weights:
+            w = Path(args.weights)
+            weights = str(w.with_suffix(".onnx")) if w.suffix.lower() == ".pt" else str(w)
+        else:
+            weights = str(Path(__file__).resolve().parents[2] /
+                          "runs/detect/landmark_v5_1025/weights/best.onnx")
+        if not Path(weights).exists():
+            raise SystemExit(f"找不到 {weights}，请先运行 src/inference/export_onnx.py")
+    else:
+        weights = args.weights or find_weights(args.openvino)
     print(f"加载模型: {weights}")
     model = YOLO(weights)
 
