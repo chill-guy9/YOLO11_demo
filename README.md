@@ -16,6 +16,7 @@ YOLO11 建筑识别完整工程。任务要求：≥5 类标志性建筑、≥20
 │   ├── labeled/                 # 标注源：329 张图 + X-AnyLabeling json + YOLO txt
 │   ├── data_raw/                # 采集的原始图（330 张，按类别分文件夹）
 │   ├── demo_imgs/               # 图像推理演示输入（10 张）
+│   ├── predict_inputs/          # ★ 待识别图片放置位置（放进去 → 运行 → 自动出画框图）
 │   └── demo.mp4                 # 视频推理演示输入（58.8s，1280×720）
 ├── src/
 │   ├── data_prep/               # ① 数据准备：采集 → 预标注 → 清洗 → 划分 → 质检
@@ -51,6 +52,7 @@ YOLO11 建筑识别完整工程。任务要求：≥5 类标志性建筑、≥20
 │   └── archive_best_*.pt        # 旧标注训练的对照权重
 ├── runs/
 │   ├── detect/<实验名>/         # 训练曲线、混淆矩阵、PR/F1、weights/
+│   ├── detect/predict_inputs/<时间戳>/  # 每次运行的画框图，独立目录、互不覆盖
 │   ├── video/result.mp4         # 视频推理成品
 │   ├── demo_predict/            # 图像推理结果
 │   └── demo_grid.jpg            # 结果九宫格
@@ -113,9 +115,9 @@ python src/train_eval/train.py --epochs 1 --name test_speed     # 先跑 1 epoch
 ### 5. 推理演示
 
 ```bash
-# 图像
-python src/inference/predict_image.py --source data/demo.jpg --save
-python src/inference/predict_image.py --source data/test_imgs/
+# 图像（推荐：直接点运行，见 5.2 节的「图片放置位置」工作流）
+python src/inference/predict_image.py
+python src/inference/predict_image.py --source data/demo.jpg          # 老用法：指定单图/文件夹
 
 # 视频（结果存 runs/video/result.mp4；--show 弹窗观看）
 python src/inference/predict_video.py --source data/demo.mp4
@@ -131,7 +133,7 @@ python src/inference/predict_image.py --source data/demo.jpg --openvino
 ```bash
 python src/inference/export_onnx.py        # -> runs/detect/landmark_v5_1025/weights/best.onnx
 python src/train_eval/compare_pt_onnx.py   # 三方对比，结果存 runs/detect/landmark_v5_1025/compare/results.json
-python src/inference/predict_image.py --onnx
+python src/inference/predict_image.py --source eiffel-tower-test.jpg --onnx  # 老模式：指定单图
 python src/inference/predict_video.py --source data/demo.mp4 --onnx
 python src/inference/predict_onnx_native.py --save   # 纯 onnxruntime，不依赖 torch/ultralytics
 python runs/detect/landmark_v5_1025/compare/verify_native_onnx.py  # 与官方管线逐框校验
@@ -158,6 +160,46 @@ python src/inference/predict_onnx_nms_native.py --save  # 最优变体的纯部�
 > ✅ `data.yaml` 的 `path` 已从迁移前的桌面旧目录修正为 `D:/YOLO训练识别/data/dataset`
 > （`python src/data_prep/split_dataset.py --yaml-only`，只改路径不重新划分数据集），
 > 现在可以直接 `yolo val` / 重训练。
+
+### 5.2 图片放置位置工作流（2026-11-08 新增）
+
+`src/inference/predict_image.py` 默认走「放置位置」模式，**不用加 `--save`，也不用带任何参数**，
+在 PyCharm 里直接点运行即可：
+
+| 位置 | 路径 | 作用 |
+|------|------|------|
+| 图片放置位置 | `data/predict_inputs/` | 把要识别的图片丢进这里（脚本自动创建） |
+| 画框结果位置 | `runs/detect/predict_inputs/<时间戳>/` | 每次运行一个独立目录，绝不覆盖旧结果 |
+| 已处理记录 | `runs/detect/predict_inputs/.processed.json` | 记录哪些图已经出过图，避免重复生成 |
+
+```bash
+# 1) 往 data/predict_inputs/ 放一张新图
+# 2) 直接运行（默认 ONNX Runtime + 自动保存画框图）
+python src/inference/predict_image.py
+
+# 再放一张新图，再运行 → 只处理新加的那张，并生成新的时间戳目录
+# 没有新图时运行 → 只给提示，不生成任何文件（旧结果保持原样）
+
+python src/inference/predict_image.py --reprocess   # 强制重跑放置位置里所有图（仍写新目录）
+python src/inference/predict_image.py --no-save    # 只打印识别文字，不写画框图
+python src/inference/predict_image.py --input-dir D:/my_imgs --out-root D:/my_results  # 换位置
+```
+
+行为约定（已实测）：
+
+- **原图只读**：用 `cv2.imdecode` 读、`result.plot()` 出副本，永远不改写/删除/重命名放置位置里的图片
+- **旧结果不覆盖**：输出目录名带微秒时间戳（`20261108_151735_398261`），同批同名文件自动加序号
+- **只处理新增**：按 `文件名|大小|修改时间` 记指纹，重复运行不重复出图；替换同名图片内容会被视为新图
+- **老用法仍可用**：`--source <图片/文件夹>`、`--onnx`、`--openvino`、`--conf`、`--iou` 等参数不变，
+  只是画框图同样改存到独立时间戳目录，不再递增 `predict/` → `predict2/`
+- **删了结果图不会自动补跑**：`.processed.json` 记的是「这张原图处理过」（按 `文件名|大小|mtime`），
+  不是「结果图还在」。删掉时间戳目录或里面的画框图，原图指纹不变 → 下次运行判定为 idle、不生成任何文件。
+  想让旧图重新出图，加 `--reprocess`（仍写入新的时间戳目录，不覆盖旧结果）
+
+> 实测（2026-11-08）：第 1 次放 `01_eiffel.jpg` → `eiffel_tower conf=0.92`；
+> 加入 `02_opera.jpg` 后第 2 次运行只处理新图 → `sydney_opera conf=0.94`；
+> 第 3 次无新图 → idle 不产文件；`--reprocess` 重跑 2 张 → 新建第 3 个目录。
+> 全程复验：原图 md5 `d2fd3e91…`、第 1 次画框图 md5 `9fdcb16e…` **三次比对均未变化**。
 
 ## 项目状态：已完成 ✅（2026-10-25）
 
